@@ -7,12 +7,12 @@ agent chat UI inside Neovim.
 ## Concepts
 
 - **Executable**: the concrete command or path, such as `pi-dev` or a local build.
-- **Runtime**: the CLI and streaming protocol shared by compatible executables.
+- **Harness**: the CLI and streaming protocol shared by compatible executables.
 - **Destination**: where a request is handled: the read Float or the Editor.
-- **Agent Session**: a Read conversation owned by this integration and targeted by an explicit runtime session ID.
+- **Agent Session**: a Read conversation owned by this integration and targeted by an explicit harness session ID.
 - **Response**: the retained output of one Read request within an Agent Session.
 
-The built-in `pi` runtime can be used with any compatible executable:
+The built-in `pi` harness can be used with any compatible executable:
 
 ```lua
 require("psst").setup({
@@ -50,7 +50,7 @@ require("psst").setup({
 })
 ```
 
-- The first request creates an Agent Session with an explicit runtime identity.
+- The first request creates an Agent Session with an explicit harness identity.
 - `<CR>` continues the Selected Session when its working directory matches the
   prompt invocation; otherwise it creates a new Agent Session.
 - `<C-CR>` always creates a new Agent Session.
@@ -94,15 +94,15 @@ There is no generated-alternative history and no streamed ghost-code acceptance
 flow. Further revisions use the current buffer as context for another one-shot
 request.
 
-## Runtime support
+## Harness support
 
-Runtime adapters are currently built in. The executable and runtime are separate
+Harness adapters are currently built in. The executable and harness are separate
 so forks, wrappers, and local development builds can share a protocol. A future
-standalone plugin may expose runtime registration for additional agents such as
+standalone plugin may expose harness registration for additional agents such as
 OpenCode or Claude Code.
 
 ## Intentional limits
 
 - Agent Session navigation does not survive a Neovim restart.
 - Generate has no conversational state or alternative history.
-- Runtime registration is not public yet.
+- Harness registration is not public yet.

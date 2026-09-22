@@ -179,3 +179,9 @@ just check
 ```
 
 `just check` verifies formatting and runs the tests in headless Neovim.
+
+## Design notes
+
+- [`docs/interaction.md`](docs/interaction.md)
+- [`docs/inline-context.md`](docs/inline-context.md)
+- [`docs/session-history.md`](docs/session-history.md)

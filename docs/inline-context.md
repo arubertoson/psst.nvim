@@ -96,9 +96,9 @@ The supported forms are:
 Examples:
 
 ```text
-@lua/aru/agent.lua
-@lua/aru/agent.lua:120-180
-@lua/aru/agent.lua#send
+@lua/psst/init.lua
+@lua/psst/init.lua:120-180
+@lua/psst/init.lua#send
 @#send
 ```
 
@@ -109,7 +109,7 @@ prompt opens.
 References may be wrapped in Markdown backticks:
 
 ```text
-Compare `@lua/aru/agent.lua#send` with `@lua/aru/agent/runtime.lua:20-45`.
+Compare `@lua/psst/init.lua#send` with `@lua/psst/adapters/pi.lua:20-45`.
 ```
 
 Backticks are delimiters and are not part of the reference.
@@ -144,9 +144,9 @@ Examples:
 
 ```text
 @lua/aru/agen|
-@lua/aru/agent.lua#|
-@lua/aru/agent.lua#sen|
-@lua/aru/agent.lua:120-|
+@lua/psst/init.lua#|
+@lua/psst/init.lua#sen|
+@lua/psst/init.lua:120-|
 ```
 
 An editing reference contributes no Context Item and is not presented as an
@@ -160,9 +160,9 @@ symbol. Resolution does not require the cursor to leave the reference.
 Examples:
 
 ```text
-@lua/aru/agent.lua
-@lua/aru/agent.lua#send
-@lua/aru/agent.lua:120-180
+@lua/psst/init.lua
+@lua/psst/init.lua#send
+@lua/psst/init.lua:120-180
 ```
 
 A resolved reference contributes one Context Item.
@@ -185,10 +185,10 @@ Given this sequence:
 
 ```text
 @lua/aru/agen
-@lua/aru/agent.lua
-@lua/aru/agent.lua#
-@lua/aru/agent.lua#send
-@lua/aru/agent.lua#sen
+@lua/psst/init.lua
+@lua/psst/init.lua#
+@lua/psst/init.lua#send
+@lua/psst/init.lua#sen
 ```
 
 The derived states and context are:
@@ -196,11 +196,11 @@ The derived states and context are:
 | Text | State | Attached explicit context |
 | --- | --- | --- |
 | `@lua/aru/agen` while editing | editing | none |
-| `@lua/aru/agent.lua` | resolved | whole file |
-| `@lua/aru/agent.lua#` | editing | none |
-| `@lua/aru/agent.lua#send` | resolved | symbol range |
-| `@lua/aru/agent.lua#sen` while editing | editing | none |
-| `@lua/aru/agent.lua#sen` after leaving it | unresolved | none |
+| `@lua/psst/init.lua` | resolved | whole file |
+| `@lua/psst/init.lua#` | editing | none |
+| `@lua/psst/init.lua#send` | resolved | symbol range |
+| `@lua/psst/init.lua#sen` while editing | editing | none |
+| `@lua/psst/init.lua#sen` after leaving it | unresolved | none |
 | reference deleted | absent from parse result | none |
 
 Adding `#` or `:` to a resolved whole-file reference immediately removes the
@@ -269,7 +269,7 @@ Selecting a file inserts only its relative path after `@`.
 Typing `#` after a resolvable file path switches to a symbol provider:
 
 ```text
-@lua/aru/agent.lua#
+@lua/psst/init.lua#
 ```
 
 Candidates include their kind and range:
@@ -408,11 +408,11 @@ Attribute values must be escaped. Source context blocks precede the original
 prompt, matching Pi's native initial-message ordering:
 
 ```xml
-<file name="/project/lua/aru/agent.lua" symbol="send" lines="126-174">
+<file name="/project/lua/psst/init.lua" symbol="send" lines="126-174">
 ...
 </file>
 
-Compare @lua/aru/agent.lua#send with the current implementation.
+Compare @lua/psst/init.lua#send with the current implementation.
 ```
 
 Non-source context, such as diagnostics, retains a distinct descriptive tag.
@@ -450,31 +450,31 @@ notification names the reference and does not mutate or close the prompt.
 
 ### Reference parser
 
-`lua/aru/agent/reference.lua` owns syntax recognition, lexical spans, selector
+`lua/psst/reference.lua` owns syntax recognition, lexical spans, selector
 parsing, and derived editing versus unresolved classification.
 
 ### Context resolver
 
-`lua/aru/agent/context.lua` owns path normalization, buffer acquisition, file and
+`lua/psst/context.lua` owns path normalization, buffer acquisition, file and
 range extraction, Treesitter symbol indexing, resolution outcomes, context
 composition, and exact-range deduplication.
 
 ### File and symbol completion
 
-`lua/aru/agent/completion/files.lua` adapts project-wide file candidates to
-Blink completion items. `lua/aru/agent/completion/symbol.lua` adapts resolved
+`lua/psst/completion/files.lua` adapts project-wide file candidates to
+Blink completion items. `lua/psst/completion/symbol.lua` adapts resolved
 symbol candidates and must use the context resolver's symbol index rather than
 implementing a second symbol scanner.
 
 ### Prompt
 
-`lua/aru/agent/prompt.lua` owns debounce lifecycle, cursor-aware refresh,
+`lua/psst/prompt.lua` owns debounce lifecycle, cursor-aware refresh,
 reference extmarks, action-footer rendering, expanded context-overview
 presentation, and submission refusal without closing the prompt.
 
 ### Payload
 
-`lua/aru/agent/payload.lua` owns escaping and rendering typed Context Items. It
+`lua/psst/payload.lua` owns escaping and rendering typed Context Items. It
 must render source context before prompt text and match Pi's whole-file format.
 
 ## Acceptance criteria

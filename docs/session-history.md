@@ -15,7 +15,7 @@ The response float must remain glanceable. It displays only the selected respons
 This specification covers:
 
 - the in-memory Agent Session and Response model;
-- explicit runtime session identity;
+- explicit harness session identity;
 - response navigation within a session;
 - navigation between sessions;
 - response-float title state;
@@ -50,7 +50,7 @@ The integration owns an ordered collection of sessions and one selected-session 
 ### Invariants
 
 - Every Read response belongs to exactly one Agent Session.
-- Every Agent Session has one explicit runtime session ID and one working directory.
+- Every Agent Session has one explicit harness session ID and one working directory.
 - At most one Read response may be streaming at a time.
 - A session's `response_index` identifies the response restored when returning to that session.
 - Continue targets the Selected Session only when its working directory matches the prompt invocation working directory.
@@ -62,11 +62,11 @@ The integration owns an ordered collection of sessions and one selected-session 
 
 ## Session identity
 
-Neovim must generate an explicit session ID before starting the first request in an Agent Session. The Pi runtime must receive that exact identity through `--session-id` together with the configured `--session-dir`.
+Neovim must generate an explicit session ID before starting the first request in an Agent Session. The Pi harness must receive that exact identity through `--session-id` together with the configured `--session-dir`.
 
 Subsequent requests in the same Agent Session must use the same explicit ID. They must not use `--continue`, because `--continue` identifies a session indirectly and cannot reliably resume a session selected through navigation.
 
-Runtime adapters must express explicit session identity as a capability. A runtime that cannot target a session by ID cannot provide session navigation and must fail visibly rather than silently continuing another conversation.
+Harness adapters must express explicit session identity as a capability. A harness that cannot target a session by ID cannot provide session navigation and must fail visibly rather than silently continuing another conversation.
 
 Session identity is retained only for the lifetime of Neovim. External session files remain in the Session Store until explicitly cleared.
 
@@ -76,11 +76,11 @@ Session identity is retained only for the lifetime of Neovim. External session f
 
 When the prompt is submitted with `<CR>`:
 
-1. If the Selected Session belongs to the invocation working directory, append a streaming Response to it and invoke the runtime with that session's ID.
-2. Otherwise, create and select a new Agent Session for the invocation working directory, append its first streaming Response, and invoke the runtime with the new ID.
+1. If the Selected Session belongs to the invocation working directory, append a streaming Response to it and invoke the harness with that session's ID.
+2. Otherwise, create and select a new Agent Session for the invocation working directory, append its first streaming Response, and invoke the harness with the new ID.
 3. Select the newly appended Response.
 
-A successful or failed runtime result finalizes the Response as `complete` or `error`. Failed responses remain navigable at a glance and may contain the existing concise error line.
+A successful or failed harness result finalizes the Response as `complete` or `error`. Failed responses remain navigable at a glance and may contain the existing concise error line.
 
 ### New session: `<C-CR>`
 
@@ -89,7 +89,7 @@ When the prompt is submitted with `<C-CR>`:
 1. Create a new Agent Session even when a continuable session is selected.
 2. Append it to session history and select it.
 3. Add and select its first streaming Response.
-4. Invoke the runtime with the new session's explicit ID.
+4. Invoke the harness with the new session's explicit ID.
 
 A session is never created without a corresponding Read request.
 
@@ -119,7 +119,7 @@ Navigation stops at the first and last response; it does not wrap and never cros
 
 Session navigation stops at the first and last session and does not wrap. Selecting a session restores the response identified by that session's `response_index`.
 
-Session and response navigation remains available while a Response is streaming. Navigating away does not interrupt the active process or change the streaming Response's ownership. Streamed output continues to accumulate in that Response, and returning to it renders all output received while it was not selected. Runtime completion does not change the current selection.
+Session and response navigation remains available while a Response is streaming. Navigating away does not interrupt the active process or change the streaming Response's ownership. Streamed output continues to accumulate in that Response, and returning to it renders all output received while it was not selected. Harness completion does not change the current selection.
 
 Navigation from a closed float reopens the float at the selected target. `<leader>P` restores the currently selected response without changing either index.
 
@@ -137,7 +137,7 @@ Where:
 
 - `S2/3` is the Selected Session position and total session count;
 - `R1/4` is the selected Response position and response count within that session; and
-- `pi` is the existing runtime label.
+- `pi` is the existing harness label.
 
 When the selected Response is streaming, the existing spinner and progress phrase follow the indices:
 
@@ -219,7 +219,7 @@ The Session Store is recreated lazily by the next Read request. The command take
 
 ### Session history
 
-`lua/aru/agent/session.lua` owns:
+`lua/psst/session.lua` owns:
 
 - Agent Session creation and explicit IDs;
 - session and response collections;
@@ -232,7 +232,7 @@ It must model active state explicitly rather than representing every field as op
 
 ### Response channel
 
-`lua/aru/agent/channels/float.lua` owns:
+`lua/psst/channels/float.lua` owns:
 
 - the volatile float window, buffer, extmarks, timers, and stream state;
 - rendering the selected Response;
@@ -242,13 +242,13 @@ It must model active state explicitly rather than representing every field as op
 
 The float channel must not maintain a second response-history collection.
 
-### Runtime
+### Harness
 
-`lua/aru/agent/runtime.lua` owns translating an explicit session ID into runtime arguments. Session selection must be resolved before building the command.
+`lua/psst/adapters/pi.lua` owns translating an explicit session ID into harness arguments. Session selection must be resolved before building the command.
 
 ### Facade and command
 
-`lua/aru/agent.lua` coordinates request submission and exposes session/response navigation and clearing through the public agent facade. It registers `:PsstSessionsClear` during setup.
+`lua/psst/init.lua` coordinates request submission and exposes session/response navigation and clearing through the public agent facade. It registers `:PsstSessionsClear` during setup.
 
 ## Compatibility and migration
 
@@ -272,7 +272,7 @@ The float channel must not maintain a second response-history collection.
 - A second Read request is rejected while one is streaming.
 - Session and response navigation remain available while streaming.
 - Navigating away from a streaming Response does not interrupt it or lose output.
-- Runtime completion does not move the current selection.
+- Harness completion does not move the current selection.
 - `:PsstSessionsClear` removes the dedicated Session Store and all in-memory history.
 - `:PsstSessionsClear` leaves state unchanged when disk removal fails.
 - `:PsstSessionsClear` refuses to run while streaming.
@@ -293,7 +293,7 @@ The float channel must not maintain a second response-history collection.
 - rejection of concurrent Read requests;
 - navigation while a non-selected Response continues streaming;
 - restoration of output accumulated while the streaming Response was not selected;
-- runtime completion preserving the current selection;
+- harness completion preserving the current selection;
 - successful clear with existing disk and memory state;
 - clear with an absent Session Store;
 - failed disk removal preserving memory and float state;
