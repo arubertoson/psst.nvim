@@ -143,7 +143,7 @@ the cursor remains inside its span.
 Examples:
 
 ```text
-@lua/aru/agen|
+@lua/pss|
 @lua/psst/init.lua#|
 @lua/psst/init.lua#sen|
 @lua/psst/init.lua:120-|
@@ -184,7 +184,7 @@ the first unresolved reference.
 Given this sequence:
 
 ```text
-@lua/aru/agen
+@lua/pss
 @lua/psst/init.lua
 @lua/psst/init.lua#
 @lua/psst/init.lua#send
@@ -195,7 +195,7 @@ The derived states and context are:
 
 | Text | State | Attached explicit context |
 | --- | --- | --- |
-| `@lua/aru/agen` while editing | editing | none |
+| `@lua/pss` while editing | editing | none |
 | `@lua/psst/init.lua` | resolved | whole file |
 | `@lua/psst/init.lua#` | editing | none |
 | `@lua/psst/init.lua#send` | resolved | symbol range |
