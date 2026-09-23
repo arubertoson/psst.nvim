@@ -16,6 +16,8 @@ your buffers. Just a quiet aside when you need one.
 
 ## The loop
 
+[![Psst asking a contextual question in Neovim](https://github.com/arubertoson/psst.nvim/releases/download/demo/demo.gif)](https://github.com/arubertoson/psst.nvim/releases/tag/demo)
+
 1. Stop on confusing code, a diagnostic, or an unfinished edit.
 2. Open `psst` without leaving the buffer.
 3. Ask the small question that unblocks the work.

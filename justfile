@@ -27,3 +27,7 @@ test:
 # Run one test file.
 test-file file:
     @nvim --headless --noplugin -u tests/init.lua -c "lua MiniTest.run_file('{{file}}')"
+
+# Record the deterministic terminal demo GIF (requires VHS).
+demo:
+    @vhs scripts/demo/demo.tape
