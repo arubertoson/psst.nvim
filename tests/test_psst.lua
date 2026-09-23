@@ -132,6 +132,12 @@ T["harness"]["config rejects malformed and unknown options"] = function()
     local invalid = {
         { opts = { executable = "" }, message = "executable" },
         { opts = { typo = true }, message = "unknown psst config option" },
+        { opts = { keymaps = true }, message = "psst keymaps config must be a table" },
+        {
+            opts = { keymaps = { global = "yes" } },
+            message = "psst keymaps global must be a boolean",
+        },
+        { opts = { keymaps = { typo = true } }, message = "unknown psst keymaps option" },
     }
 
     for _, case in ipairs(invalid) do
@@ -517,6 +523,185 @@ T["float"]["lifecycle hooks run once per visibility transition"] = function()
     float.focus()
     vim.api.nvim_win_close(0, true)
     MiniTest.expect.equality({ before_open, after_close }, { 2, 2 })
+end
+
+T["float"]["focused mappings navigate responses and sessions without leaking"] = function()
+    local session = require("psst.session")
+    local float = require("psst.channels.float")
+    local _, first = session.begin_read("/one", "pi", false)
+    float.send(completed_float_transport(first, "first prompt", "first answer"), {})
+    local _, second = session.begin_read("/one", "pi", false)
+    float.send(completed_float_transport(second, "second prompt", "second answer"), {})
+    local _, third = session.begin_read("/two", "pi", true)
+    float.send(completed_float_transport(third, "third prompt", "third answer"), {})
+
+    local source_buf = vim.api.nvim_get_current_buf()
+    local win = float_window()
+    local buf = vim.api.nvim_win_get_buf(win)
+    MiniTest.expect.equality(float.is_visible(), true)
+    MiniTest.expect.equality(vim.fn.maparg("[r", "n", false, true).buffer or 0, 0)
+    for _, lhs in ipairs({
+        "<M-h>",
+        "<M-l>",
+        "<M-H>",
+        "<M-L>",
+        "[r",
+        "]r",
+        "[s",
+        "]s",
+        "<M-u>",
+        "<M-d>",
+        "<C-u>",
+        "<C-d>",
+    }) do
+        local found = false
+        for _, map in ipairs(vim.api.nvim_buf_get_keymap(buf, "n")) do
+            if
+                vim.api.nvim_replace_termcodes(map.lhs, true, false, true)
+                == vim.api.nvim_replace_termcodes(lhs, true, false, true)
+            then
+                found = true
+            end
+        end
+        if not found then error("missing float mapping: " .. lhs) end
+    end
+    vim.cmd("tabnew")
+    MiniTest.expect.equality(float.is_visible(), false)
+    vim.cmd("tabclose")
+    MiniTest.expect.equality(float.is_visible(), true)
+
+    float.focus()
+    local function press(lhs)
+        vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(lhs, true, false, true), "xt", false)
+    end
+
+    press("[s")
+    MiniTest.expect.equality(session.selection().session_index, 1)
+    MiniTest.expect.equality(session.selection().response_index, 2)
+    MiniTest.expect.equality(float_lines(), { "second answer" })
+    press("<M-h>")
+    MiniTest.expect.equality(session.selection().response_index, 1)
+    press("<M-l>")
+    MiniTest.expect.equality(session.selection().response_index, 2)
+    press("[r")
+    MiniTest.expect.equality(session.selection().response_index, 1)
+    press("]r")
+    MiniTest.expect.equality(session.selection().response_index, 2)
+    press("<M-L>")
+    MiniTest.expect.equality(session.selection().session_index, 2)
+    press("<M-H>")
+    MiniTest.expect.equality(session.selection().session_index, 1)
+    press("]s")
+    MiniTest.expect.equality(session.selection().session_index, 2)
+
+    float.close()
+    MiniTest.expect.equality(float.is_visible(), false)
+    MiniTest.expect.equality(vim.api.nvim_buf_is_valid(buf), false)
+    MiniTest.expect.equality(vim.fn.maparg("[r", "n", false, true).buffer or 0, 0)
+    MiniTest.expect.equality(vim.api.nvim_buf_is_valid(source_buf), true)
+end
+
+T["float"]["scroll mappings move the focused float"] = function()
+    local session = require("psst.session")
+    local float = require("psst.channels.float")
+    local _, response = session.begin_read(vim.fn.getcwd(), "pi", false)
+    local lines = {}
+    for i = 1, 100 do
+        lines[i] = "line " .. i
+    end
+    float.send(completed_float_transport(response, "question", table.concat(lines, "\n")), {})
+    local win = float_window()
+    local source_win = vim.api.nvim_get_current_win()
+    float.focus()
+    local function press(lhs)
+        vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(lhs, true, false, true), "xt", false)
+    end
+    local function topline()
+        return vim.api.nvim_win_call(win, function() return vim.fn.winsaveview().topline end)
+    end
+
+    press("<M-d>")
+    MiniTest.expect.equality(topline() > 1, true)
+    press("<C-u>")
+    MiniTest.expect.equality(topline(), 1)
+    press("<C-d>")
+    MiniTest.expect.equality(topline() > 1, true)
+    press("<M-u>")
+    MiniTest.expect.equality(topline(), 1)
+
+    vim.api.nvim_set_current_win(source_win)
+    require("psst").float.scroll("down")
+    MiniTest.expect.equality(topline() > 1, true)
+    MiniTest.expect.equality(vim.api.nvim_get_current_win(), source_win)
+    require("psst").float.scroll("up")
+    MiniTest.expect.equality(topline(), 1)
+
+    local agent = require("psst")
+    agent.setup({ keymaps = { global = true } })
+    press("<M-d>")
+    MiniTest.expect.equality(topline() > 1, true)
+    press("<M-u>")
+    MiniTest.expect.equality(topline(), 1)
+    MiniTest.expect.equality(vim.api.nvim_get_current_win(), source_win)
+    agent.setup({ keymaps = { global = false } })
+end
+
+T["float"]["global mappings are opt-in and respect existing user keys"] = function()
+    local agent = require("psst")
+    local function global_map(lhs)
+        for _, mapping in ipairs(vim.api.nvim_get_keymap("n")) do
+            if mapping.lhs == lhs then return mapping end
+        end
+    end
+
+    agent.setup()
+    MiniTest.expect.equality(global_map("<M-l>"), nil)
+    local custom = function() end
+    vim.keymap.set("n", "<M-h>", custom)
+    agent.setup({ keymaps = { global = true } })
+    MiniTest.expect.equality(global_map("<M-h>").callback, custom)
+    MiniTest.expect.equality(global_map("<M-l>").desc, "Psst: next response")
+    agent.setup({ keymaps = { global = true } })
+    MiniTest.expect.equality(global_map("<M-h>").callback, custom)
+
+    vim.keymap.set("n", "<M-l>", custom)
+    agent.setup({ keymaps = { global = false } })
+    MiniTest.expect.equality(global_map("<M-h>").callback, custom)
+    MiniTest.expect.equality(global_map("<M-l>").callback, custom)
+    MiniTest.expect.equality(global_map("<M-H>"), nil)
+    vim.keymap.del("n", "<M-h>")
+    vim.keymap.del("n", "<M-l>")
+end
+
+T["float"]["opted-in global navigation works from the editor and a closed float"] = function()
+    local agent = require("psst")
+    agent.setup({ keymaps = { global = true } })
+    local session = require("psst.session")
+    local float = require("psst.channels.float")
+    local _, first = session.begin_read("/one", "pi", false)
+    float.send(completed_float_transport(first, "first", "first answer"), {})
+    local _, second = session.begin_read("/one", "pi", false)
+    float.send(completed_float_transport(second, "second", "second answer"), {})
+    local _, third = session.begin_read("/two", "pi", true)
+    float.send(completed_float_transport(third, "third", "third answer"), {})
+    local source_win = vim.api.nvim_get_current_win()
+    local function press(lhs)
+        vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(lhs, true, false, true), "xt", false)
+    end
+
+    press("<M-H>")
+    MiniTest.expect.equality(session.selection().session_index, 1)
+    MiniTest.expect.equality(vim.api.nvim_get_current_win(), source_win)
+    press("<M-h>")
+    MiniTest.expect.equality(session.selection().response_index, 1)
+    MiniTest.expect.equality(float_lines(), { "first answer" })
+    float.close()
+    press("<M-l>")
+    MiniTest.expect.equality(session.selection().response_index, 2)
+    MiniTest.expect.equality(float_lines(), { "second answer" })
+    press("<M-L>")
+    MiniTest.expect.equality(session.selection().session_index, 2)
+    agent.setup({ keymaps = { global = false } })
 end
 
 T["float"]["navigation does not interrupt a background stream"] = function()

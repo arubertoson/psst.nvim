@@ -59,15 +59,22 @@ require("psst").setup({
 - Only one Response can stream at a time. Navigation remains available while it
   streams in the background.
 
-Float controls:
+While focused, the Float has buffer-local controls:
 
-| Key | Action |
-| --- | --- |
-| `<leader>P` | Focus, unfocus, or restore the Float |
-| `<M-h>` / `<M-l>` | Previous / next Response in the Selected Session |
-| `<M-H>` / `<M-L>` | Previous / next Agent Session |
-| `<M-u>` / `<M-d>` | Scroll up / down |
-| `q` / `<Esc>` | Close while focused |
+| Key | Action | Fallback |
+| --- | --- | --- |
+| `<M-h>` / `<M-l>` | Previous / next Response in the Selected Session | `[r` / `]r` |
+| `<M-H>` / `<M-L>` | Previous / next Agent Session | `[s` / `]s` |
+| `<M-u>` / `<M-d>` | Scroll up / down | `<C-u>` / `<C-d>` |
+| `q` / `<Esc>` | Close | |
+
+Alt/Meta depends on terminal support. Global Alt mappings are opt-in via
+`setup({ keymaps = { global = true } })` and never overwrite existing global keys.
+These allow navigation from the editor or a closed float. Set `global = false` to
+remove plugin-owned mappings. The plugin does not set `<leader>P`; map
+`require("psst").float.focus()` yourself. `require("psst").float.is_visible()`
+reports whether the Float is in the current tab for user-defined visibility-based
+mappings.
 
 `:PsstSessionsClear` removes all in-memory Agent Sessions and the disposable
 Session Store. It refuses to run while a Response is streaming.

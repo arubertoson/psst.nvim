@@ -214,6 +214,8 @@ function M.float.session_prev() navigate_session(-1) end
 
 function M.float.session_next() navigate_session(1) end
 
+function M.float.is_visible() return require("psst.channels.float").is_visible() end
+
 function M.float.focus() return require("psst.channels.float").focus() end
 
 function M.float.close() return require("psst.channels.float").close() end
@@ -251,9 +253,54 @@ function M.sessions_clear()
     return true
 end
 
+---@type table<string, function>
+local owned_global_keymaps = {}
+
+---@param lhs string
+---@return table|nil
+local function global_keymap(lhs)
+    for _, mapping in ipairs(vim.api.nvim_get_keymap("n")) do
+        if mapping.lhs == lhs then return mapping end
+    end
+    return nil
+end
+
+local function setup_global_keymaps()
+    for lhs, callback in pairs(owned_global_keymaps) do
+        local mapping = global_keymap(lhs)
+        if mapping and mapping.callback == callback then vim.keymap.del("n", lhs) end
+    end
+    owned_global_keymaps = {}
+    if not config.get().keymaps.global then return end
+
+    for _, mapping in ipairs({
+        { lhs = "<M-h>", action = M.float.response_prev, desc = "Psst: previous response" },
+        { lhs = "<M-l>", action = M.float.response_next, desc = "Psst: next response" },
+        { lhs = "<M-H>", action = M.float.session_prev, desc = "Psst: previous session" },
+        { lhs = "<M-L>", action = M.float.session_next, desc = "Psst: next session" },
+        { lhs = "<M-u>", action = function() M.float.scroll("up") end, desc = "Psst: scroll up" },
+        {
+            lhs = "<M-d>",
+            action = function() M.float.scroll("down") end,
+            desc = "Psst: scroll down",
+        },
+    }) do
+        if not global_keymap(mapping.lhs) then
+            vim.keymap.set(
+                "n",
+                mapping.lhs,
+                mapping.action,
+                { silent = true, desc = mapping.desc }
+            )
+            owned_global_keymaps[mapping.lhs] = mapping.action
+        end
+    end
+end
+
 ---@param opts Psst.config.Opts|nil
 function M.setup(opts)
     config.setup(opts)
+    setup_global_keymaps()
     vim.api.nvim_create_user_command("PsstSessionsClear", M.sessions_clear, {
         desc = "Clear psst sessions and responses",
         force = true,

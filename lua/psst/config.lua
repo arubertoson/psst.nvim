@@ -19,17 +19,25 @@ local M = {}
 ---@field side Psst.config.FloatSide
 ---@field width integer
 
+---@class Psst.config.KeymapOpts
+---@field global boolean|nil
+
+---@class Psst.config.KeymapConfig
+---@field global boolean
+
 ---@class Psst.config.Opts
 ---@field executable string|nil
 ---@field adapter string|nil
 ---@field session_dir string|nil
 ---@field float Psst.config.FloatOpts|nil
+---@field keymaps Psst.config.KeymapOpts|nil
 
 ---@class Psst.config.Config
 ---@field executable string
 ---@field adapter string
 ---@field session_dir string
 ---@field float Psst.config.FloatConfig
+---@field keymaps Psst.config.KeymapConfig
 
 local defaults = {
     executable = "pi",
@@ -39,6 +47,7 @@ local defaults = {
         side = "right",
         width = 60,
     },
+    keymaps = { global = false },
 }
 
 ---@type Psst.config.Config
@@ -49,7 +58,10 @@ local CONFIG_KEYS = {
     adapter = true,
     session_dir = true,
     float = true,
+    keymaps = true,
 }
+
+local KEYMAP_KEYS = { global = true }
 
 local FLOAT_KEYS = {
     side = true,
@@ -104,6 +116,14 @@ function M.setup(opts)
             if opts.float[name] ~= nil and type(opts.float[name]) ~= "function" then
                 error("psst float " .. name .. " must be a function")
             end
+        end
+    end
+
+    if opts.keymaps ~= nil then
+        if type(opts.keymaps) ~= "table" then error("psst keymaps config must be a table") end
+        validate_keys(opts.keymaps, KEYMAP_KEYS, "psst keymaps")
+        if opts.keymaps.global ~= nil and type(opts.keymaps.global) ~= "boolean" then
+            error("psst keymaps global must be a boolean")
         end
     end
 

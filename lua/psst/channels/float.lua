@@ -231,28 +231,60 @@ end
 
 ---@param state Psst.channels.float.WindowState
 local function install_keymaps(state)
+    local map_opts = { buffer = state.buf, silent = true, nowait = true }
     for _, mapping in ipairs({
         { lhs = "<C-d>", direction = "down" },
+        { lhs = "<M-d>", direction = "down" },
         { lhs = "<C-u>", direction = "up" },
+        { lhs = "<M-u>", direction = "up" },
     }) do
         local direction = mapping.direction
-        local lhs = mapping.lhs
         for _, mode in ipairs({ "n", "i" }) do
-            vim.keymap.set(mode, lhs, function()
+            vim.keymap.set(mode, mapping.lhs, function()
                 local scroll_current = function()
-                    if _window then scroll(_window, direction) end
+                    if _window == state then scroll(state, direction) end
                 end
                 if mode == "i" then
                     vim.schedule(scroll_current)
                 else
                     scroll_current()
                 end
-            end, {
-                buffer = state.buf,
-                silent = true,
-                desc = "Scroll float " .. direction,
-            })
+            end, vim.tbl_extend(
+                "force",
+                map_opts,
+                { desc = "Scroll float " .. direction }
+            ))
         end
+    end
+
+    for _, mapping in ipairs({
+        {
+            lhs = "<M-h>",
+            navigate = session.navigate_response,
+            delta = -1,
+            desc = "Previous response",
+        },
+        {
+            lhs = "[r",
+            navigate = session.navigate_response,
+            delta = -1,
+            desc = "Previous response",
+        },
+        { lhs = "<M-l>", navigate = session.navigate_response, delta = 1, desc = "Next response" },
+        { lhs = "]r", navigate = session.navigate_response, delta = 1, desc = "Next response" },
+        {
+            lhs = "<M-H>",
+            navigate = session.navigate_session,
+            delta = -1,
+            desc = "Previous session",
+        },
+        { lhs = "[s", navigate = session.navigate_session, delta = -1, desc = "Previous session" },
+        { lhs = "<M-L>", navigate = session.navigate_session, delta = 1, desc = "Next session" },
+        { lhs = "]s", navigate = session.navigate_session, delta = 1, desc = "Next session" },
+    }) do
+        vim.keymap.set("n", mapping.lhs, function()
+            if _window == state and mapping.navigate(mapping.delta) then M.show_selected() end
+        end, vim.tbl_extend("force", map_opts, { desc = mapping.desc }))
     end
 end
 
@@ -468,6 +500,13 @@ function M.restore()
         return
     end
     M.show_selected()
+end
+
+function M.is_visible()
+    return _window ~= nil
+        and vim.api.nvim_win_is_valid(_window.win)
+        and vim.api.nvim_win_get_buf(_window.win) == _window.buf
+        and vim.api.nvim_win_get_tabpage(_window.win) == vim.api.nvim_get_current_tabpage()
 end
 
 function M.focus()

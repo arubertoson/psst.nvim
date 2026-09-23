@@ -101,12 +101,13 @@ Starting another Read request while a Response is streaming must be rejected wit
 
 ### Response navigation
 
-Existing response-history mappings become session-local:
+The Float maps response navigation locally. `<M-h>` / `<M-l>` are aliases for
+`[r` / `]r` when the terminal supports Alt/Meta:
 
 | Key | Action |
 | --- | --- |
-| `<M-h>` | Select the previous Response in the Selected Session |
-| `<M-l>` | Select the next Response in the Selected Session |
+| `[r` | Select the previous Response in the Selected Session |
+| `]r` | Select the next Response in the Selected Session |
 
 Navigation stops at the first and last response; it does not wrap and never crosses into another session.
 
@@ -114,14 +115,22 @@ Navigation stops at the first and last response; it does not wrap and never cros
 
 | Key | Action |
 | --- | --- |
-| `<M-H>` | Select the previous Agent Session |
-| `<M-L>` | Select the next Agent Session |
+| `[s` | Select the previous Agent Session |
+| `]s` | Select the next Agent Session |
+
+`<M-H>` / `<M-L>` are aliases for these session mappings.
 
 Session navigation stops at the first and last session and does not wrap. Selecting a session restores the response identified by that session's `response_index`.
 
 Session and response navigation remains available while a Response is streaming. Navigating away does not interrupt the active process or change the streaming Response's ownership. Streamed output continues to accumulate in that Response, and returning to it renders all output received while it was not selected. Harness completion does not change the current selection.
 
-Navigation from a closed float reopens the float at the selected target. `<leader>P` restores the currently selected response without changing either index.
+The Float installs buffer-local navigation mappings when open. Global Alt mappings
+for navigation and scrolling are opt-in via `setup({ keymaps = { global = true } })`;
+they never overwrite existing global mappings. Navigation from the editor or a closed
+float reopens the float at the selected target. Users can instead map the public
+navigation functions themselves. `require("psst").float.focus()` restores the
+currently selected response without changing either index. `require("psst").float.is_visible()`
+reports whether the Float is visible in the current tab.
 
 ## Response float
 

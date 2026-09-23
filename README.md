@@ -42,8 +42,8 @@ The editor interaction is the product. Pi is merely the first harness behind it.
 
 `psst.nvim` is not an autonomous coding environment, an agent dashboard, or a
 provider-neutral framework that flattens every harness into the same feature set. It
-does not own global keymaps, scan your repository in the background, or keep a
-permanent conversation pane open.
+does not install global keymaps by default, scan your repository in the background,
+or keep a permanent conversation pane open.
 
 It is optimized for brief, contextual inquiries made in the middle of editing.
 
@@ -83,7 +83,7 @@ vim.pack.add({
 require("psst").setup()
 ```
 
-`psst.nvim` does not install global mappings. A minimal entry point is:
+`psst.nvim` does not install global mappings by default. A minimal entry point is:
 
 ```lua
 vim.keymap.set({ "n", "x" }, "<leader>p", function()
@@ -113,7 +113,27 @@ end, { desc = "Psst: quick question" })
 Inline references can point at project files, file ranges, or symbols. The context
 overview shows the resolved material before submission.
 
-The response float can be controlled through `require("psst").float`:
+When focused, the response float has buffer-local controls:
+
+| Mapping | Action | Terminal-independent fallback |
+| --- | --- | --- |
+| `<M-u>` / `<M-d>` | Scroll up / down | `<C-u>` / `<C-d>` |
+| `<M-h>` / `<M-l>` | Previous / next response | `[r` / `]r` |
+| `<M-H>` / `<M-L>` | Previous / next session | `[s` / `]s` |
+| `q` / `<Esc>` | Close | |
+
+Global Alt mappings are off by default. To use them from the editor, opt in:
+
+```lua
+require("psst").setup({ keymaps = { global = true } })
+```
+
+They never replace existing global mappings. Set `global = false` to remove
+plugin-owned mappings. Alt/Meta key sequences depend on terminal support; use the
+float-local fallbacks or map the API yourself if they are not recognized.
+`require("psst").float.is_visible()` reports whether the response float is in the
+current tab, useful when defining your own visibility-based global mappings. The
+response float can also be controlled through `require("psst").float`:
 
 ```lua
 local psst = require("psst")
@@ -145,6 +165,7 @@ require("psst").setup({
         before_open = nil,
         after_close = nil,
     },
+    keymaps = { global = false },
 })
 ```
 
