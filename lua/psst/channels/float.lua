@@ -259,27 +259,13 @@ local function install_keymaps(state)
 
     for _, mapping in ipairs({
         {
-            lhs = "<M-h>",
-            navigate = session.navigate_response,
-            delta = -1,
-            desc = "Previous response",
-        },
-        {
             lhs = "[r",
             navigate = session.navigate_response,
             delta = -1,
             desc = "Previous response",
         },
-        { lhs = "<M-l>", navigate = session.navigate_response, delta = 1, desc = "Next response" },
         { lhs = "]r", navigate = session.navigate_response, delta = 1, desc = "Next response" },
-        {
-            lhs = "<M-H>",
-            navigate = session.navigate_session,
-            delta = -1,
-            desc = "Previous session",
-        },
         { lhs = "[s", navigate = session.navigate_session, delta = -1, desc = "Previous session" },
-        { lhs = "<M-L>", navigate = session.navigate_session, delta = 1, desc = "Next session" },
         { lhs = "]s", navigate = session.navigate_session, delta = 1, desc = "Next session" },
     }) do
         vim.keymap.set("n", mapping.lhs, function()
@@ -359,7 +345,7 @@ local function create_float_window(lines)
             if _window == state then resize(state) end
         end,
     })
-    install_keymaps(state)
+    if config.get().keymaps.float then install_keymaps(state) end
 
     local map_opts = { buffer = buf, silent = true, nowait = true }
     vim.keymap.set("n", "q", close_float, map_opts)

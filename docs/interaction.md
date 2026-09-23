@@ -63,15 +63,16 @@ While focused, the Float has buffer-local controls:
 
 | Key | Action | Fallback |
 | --- | --- | --- |
-| `<M-h>` / `<M-l>` | Previous / next Response in the Selected Session | `[r` / `]r` |
-| `<M-H>` / `<M-L>` | Previous / next Agent Session | `[s` / `]s` |
+| `[r` / `]r` | Previous / next Response in the Selected Session | |
+| `[s` / `]s` | Previous / next Agent Session | |
 | `<M-u>` / `<M-d>` | Scroll up / down | `<C-u>` / `<C-d>` |
 | `q` / `<Esc>` | Close | |
 
-Alt/Meta depends on terminal support. Global Alt mappings are opt-in via
-`setup({ keymaps = { global = true } })` and never overwrite existing global keys.
-These allow navigation from the editor or a closed float. Set `global = false` to
-remove plugin-owned mappings. The plugin does not set `<leader>P`; map
+Alt/Meta depends on terminal support. The float does not override Alt-H/L or
+Alt-Shift-H/L locally. Global Alt mappings are on by default and never overwrite
+existing global keys. Set `setup({ keymaps = { global = false } })` to leave global
+bindings to your editor configuration, or `float = false` to disable float-local
+navigation and scrolling (but not `q` / `<Esc>`). The plugin does not set `<leader>P`; map
 `require("psst").float.focus()` yourself. `require("psst").float.is_visible()`
 reports whether the Float is in the current tab for user-defined visibility-based
 mappings.

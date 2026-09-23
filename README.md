@@ -118,19 +118,23 @@ When focused, the response float has buffer-local controls:
 | Mapping | Action | Terminal-independent fallback |
 | --- | --- | --- |
 | `<M-u>` / `<M-d>` | Scroll up / down | `<C-u>` / `<C-d>` |
-| `<M-h>` / `<M-l>` | Previous / next response | `[r` / `]r` |
-| `<M-H>` / `<M-L>` | Previous / next session | `[s` / `]s` |
+| `[r` / `]r` | Previous / next response | |
+| `[s` / `]s` | Previous / next session | |
 | `q` / `<Esc>` | Close | |
 
-Global Alt mappings are off by default. To use them from the editor, opt in:
+By default, Psst maps global Alt-H/L to previous/next response, Alt-Shift-H/L to
+previous/next session, and Alt-U/D to response scrolling. The defaults never
+replace existing global keys. To define your own global policy, turn them off:
 
 ```lua
-require("psst").setup({ keymaps = { global = true } })
+require("psst").setup({ keymaps = { global = false } })
 ```
 
-They never replace existing global mappings. Set `global = false` to remove
-plugin-owned mappings. Alt/Meta key sequences depend on terminal support; use the
-float-local fallbacks or map the API yourself if they are not recognized.
+Set `keymaps.float = false` to disable float-local navigation and scrolling;
+`q` and `<Esc>` still close the float. The float does not override Alt-H/L or
+Alt-Shift-H/L locally, so your global navigation policy applies even while it is
+focused. Alt/Meta depends on terminal support; use the local fallbacks or map the
+API yourself if it is not recognized.
 `require("psst").float.is_visible()` reports whether the response float is in the
 current tab, useful when defining your own visibility-based global mappings. The
 response float can also be controlled through `require("psst").float`:

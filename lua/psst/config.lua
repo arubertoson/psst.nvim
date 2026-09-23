@@ -21,9 +21,11 @@ local M = {}
 
 ---@class Psst.config.KeymapOpts
 ---@field global boolean|nil
+---@field float boolean|nil
 
 ---@class Psst.config.KeymapConfig
 ---@field global boolean
+---@field float boolean
 
 ---@class Psst.config.Opts
 ---@field executable string|nil
@@ -47,7 +49,7 @@ local defaults = {
         side = "right",
         width = 60,
     },
-    keymaps = { global = false },
+    keymaps = { global = true, float = true },
 }
 
 ---@type Psst.config.Config
@@ -61,7 +63,7 @@ local CONFIG_KEYS = {
     keymaps = true,
 }
 
-local KEYMAP_KEYS = { global = true }
+local KEYMAP_KEYS = { global = true, float = true }
 
 local FLOAT_KEYS = {
     side = true,
@@ -122,8 +124,10 @@ function M.setup(opts)
     if opts.keymaps ~= nil then
         if type(opts.keymaps) ~= "table" then error("psst keymaps config must be a table") end
         validate_keys(opts.keymaps, KEYMAP_KEYS, "psst keymaps")
-        if opts.keymaps.global ~= nil and type(opts.keymaps.global) ~= "boolean" then
-            error("psst keymaps global must be a boolean")
+        for name, value in pairs(opts.keymaps) do
+            if type(value) ~= "boolean" then
+                error("psst keymaps " .. name .. " must be a boolean")
+            end
         end
     end
 

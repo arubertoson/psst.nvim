@@ -19,6 +19,8 @@ end
 local function unload_psst()
     local float = package.loaded["psst.channels.float"]
     if float then pcall(float.close) end
+    local agent = package.loaded.psst
+    if agent then agent.setup({ keymaps = { global = false } }) end
 
     local modules = {}
     for name in pairs(package.loaded) do
@@ -541,10 +543,6 @@ T["float"]["focused mappings navigate responses and sessions without leaking"] =
     MiniTest.expect.equality(float.is_visible(), true)
     MiniTest.expect.equality(vim.fn.maparg("[r", "n", false, true).buffer or 0, 0)
     for _, lhs in ipairs({
-        "<M-h>",
-        "<M-l>",
-        "<M-H>",
-        "<M-L>",
         "[r",
         "]r",
         "[s",
@@ -565,6 +563,11 @@ T["float"]["focused mappings navigate responses and sessions without leaking"] =
         end
         if not found then error("missing float mapping: " .. lhs) end
     end
+    for _, lhs in ipairs({ "<M-h>", "<M-l>", "<M-H>", "<M-L>" }) do
+        for _, mapping in ipairs(vim.api.nvim_buf_get_keymap(buf, "n")) do
+            MiniTest.expect.equality(mapping.lhs ~= lhs, true)
+        end
+    end
     vim.cmd("tabnew")
     MiniTest.expect.equality(float.is_visible(), false)
     vim.cmd("tabclose")
@@ -579,17 +582,13 @@ T["float"]["focused mappings navigate responses and sessions without leaking"] =
     MiniTest.expect.equality(session.selection().session_index, 1)
     MiniTest.expect.equality(session.selection().response_index, 2)
     MiniTest.expect.equality(float_lines(), { "second answer" })
-    press("<M-h>")
-    MiniTest.expect.equality(session.selection().response_index, 1)
-    press("<M-l>")
-    MiniTest.expect.equality(session.selection().response_index, 2)
     press("[r")
     MiniTest.expect.equality(session.selection().response_index, 1)
     press("]r")
     MiniTest.expect.equality(session.selection().response_index, 2)
-    press("<M-L>")
+    press("]s")
     MiniTest.expect.equality(session.selection().session_index, 2)
-    press("<M-H>")
+    press("[s")
     MiniTest.expect.equality(session.selection().session_index, 1)
     press("]s")
     MiniTest.expect.equality(session.selection().session_index, 2)
@@ -599,6 +598,24 @@ T["float"]["focused mappings navigate responses and sessions without leaking"] =
     MiniTest.expect.equality(vim.api.nvim_buf_is_valid(buf), false)
     MiniTest.expect.equality(vim.fn.maparg("[r", "n", false, true).buffer or 0, 0)
     MiniTest.expect.equality(vim.api.nvim_buf_is_valid(source_buf), true)
+end
+
+T["float"]["float navigation mappings can be disabled without losing close controls"] = function()
+    local agent = require("psst")
+    agent.setup({ keymaps = { global = false, float = false } })
+    local session = require("psst.session")
+    local float = require("psst.channels.float")
+    local _, response = session.begin_read(vim.fn.getcwd(), "pi", false)
+    float.send(completed_float_transport(response, "question", "answer"), {})
+    local buf = vim.api.nvim_win_get_buf(float_window())
+    local mapped = {}
+    for _, mapping in ipairs(vim.api.nvim_buf_get_keymap(buf, "n")) do
+        mapped[mapping.lhs] = true
+    end
+    MiniTest.expect.equality(mapped["[r"], nil)
+    MiniTest.expect.equality(mapped["<C-u>"], nil)
+    MiniTest.expect.equality(mapped.q, true)
+    MiniTest.expect.equality(mapped["<Esc>"], true)
 end
 
 T["float"]["scroll mappings move the focused float"] = function()
@@ -646,7 +663,7 @@ T["float"]["scroll mappings move the focused float"] = function()
     agent.setup({ keymaps = { global = false } })
 end
 
-T["float"]["global mappings are opt-in and respect existing user keys"] = function()
+T["float"]["default global mappings respect existing user keys"] = function()
     local agent = require("psst")
     local function global_map(lhs)
         for _, mapping in ipairs(vim.api.nvim_get_keymap("n")) do
@@ -655,6 +672,8 @@ T["float"]["global mappings are opt-in and respect existing user keys"] = functi
     end
 
     agent.setup()
+    MiniTest.expect.equality(global_map("<M-l>").desc, "Psst: next response")
+    agent.setup({ keymaps = { global = false } })
     MiniTest.expect.equality(global_map("<M-l>"), nil)
     local custom = function() end
     vim.keymap.set("n", "<M-h>", custom)
