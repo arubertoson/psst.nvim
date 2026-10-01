@@ -751,7 +751,7 @@ T["float"]["navigation does not interrupt a background stream"] = function()
     MiniTest.expect.equality(float_lines(), { "second answer" })
     MiniTest.expect.equality(
         vim.api.nvim_win_get_config(float_window()).title[1][1],
-        " pi · S2/2 · R1/2 "
+        " pi · Pi default · S2/2 · R1/2 "
     )
 
     on_event(text_event("background output"))

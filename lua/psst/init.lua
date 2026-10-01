@@ -22,6 +22,7 @@
 ---@field collect Psst.collect.Type[]|nil
 ---@field prompt string|nil
 ---@field preset string|nil
+---@field model string|nil
 ---@field context Psst.payload.ContextItem[]|nil
 
 ---@class Psst.ConfigState
@@ -57,6 +58,7 @@ local channels = require("psst.channels")
 local prompt_ui = require("psst.prompt")
 local request_validation = require("psst.request")
 local session = require("psst.session")
+local models = require("psst.models")
 
 ---@param bufnr integer
 ---@param visual_mode string|nil
@@ -118,6 +120,9 @@ local function send(request, state)
 
     local cfg = config.get()
     local adapter = adapters.get(cfg.adapter)
+    local effective_request = vim.tbl_extend("force", {}, request)
+    effective_request.model = (request.model and request.model ~= "" and request.model)
+        or models.current()
     ---@type Psst.ConfigState
     local ctx = { config = cfg, state = state }
 
@@ -141,8 +146,12 @@ local function send(request, state)
 
     if request.destination == channels.DESTINATION.FLOAT then
         local inquiry_session
-        inquiry_session, response =
-            session.begin_read(state.cwd, label, request.force_new_session == true)
+        inquiry_session, response = session.begin_read(
+            state.cwd,
+            label,
+            request.force_new_session == true,
+            effective_request.model
+        )
         target = { kind = "explicit", id = inquiry_session.id }
         intent = "inquire"
         vim.fs.mkdir(cfg.session_dir, { parents = true })
@@ -151,7 +160,7 @@ local function send(request, state)
     local function run(stdin, on_event, on_exit)
         return adapter.run({
             config = cfg,
-            request = request,
+            request = effective_request,
             target = target,
             intent = intent,
             stdin = stdin,
@@ -300,9 +309,18 @@ end
 ---@param opts Psst.config.Opts|nil
 function M.setup(opts)
     config.setup(opts)
+    models.preload()
     setup_global_keymaps()
     vim.api.nvim_create_user_command("PsstSessionsClear", M.sessions_clear, {
         desc = "Clear psst sessions and responses",
+        force = true,
+    })
+    vim.api.nvim_create_user_command("PsstModelSelect", models.pick, {
+        desc = "Select the Pi model used by psst",
+        force = true,
+    })
+    vim.api.nvim_create_user_command("PsstModelsRefresh", models.refresh, {
+        desc = "Refresh psst's cached Pi model list",
         force = true,
     })
 end

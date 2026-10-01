@@ -31,6 +31,7 @@ local M = {}
 ---@field executable string|nil
 ---@field adapter string|nil
 ---@field session_dir string|nil
+---@field model string|nil
 ---@field float Psst.config.FloatOpts|nil
 ---@field keymaps Psst.config.KeymapOpts|nil
 
@@ -38,6 +39,7 @@ local M = {}
 ---@field executable string
 ---@field adapter string
 ---@field session_dir string
+---@field model string|nil
 ---@field float Psst.config.FloatConfig
 ---@field keymaps Psst.config.KeymapConfig
 
@@ -45,6 +47,7 @@ local defaults = {
     executable = "pi",
     adapter = "pi",
     session_dir = vim.fs.joinpath(vim.fn.stdpath("cache"), "psst", "sessions"),
+    model = nil,
     float = {
         side = "right",
         width = 60,
@@ -61,6 +64,7 @@ local CONFIG_KEYS = {
     session_dir = true,
     float = true,
     keymaps = true,
+    model = true,
 }
 
 local KEYMAP_KEYS = { global = true, float = true }
@@ -96,6 +100,7 @@ function M.setup(opts)
     for _, name in ipairs({ "executable", "adapter", "session_dir" }) do
         if opts[name] ~= nil then validate_nonempty_string(opts[name], "psst " .. name) end
     end
+    if opts.model ~= nil then validate_nonempty_string(opts.model, "psst model") end
 
     if opts.float ~= nil then
         if type(opts.float) ~= "table" then error("psst float config must be a table") end

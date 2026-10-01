@@ -30,6 +30,9 @@ function M._command(config, request, target, intent)
     if request.preset and request.preset ~= "" then
         vim.list_extend(args, { "--preset", request.preset })
     end
+    if request.model and request.model ~= "" then
+        vim.list_extend(args, { "--model", request.model })
+    end
 
     if intent == "inquire" then
         vim.list_extend(args, { "--tools", table.concat(INQUIRY_TOOLS, ",") })

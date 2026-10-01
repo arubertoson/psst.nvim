@@ -12,6 +12,7 @@ local M = {}
 ---@class Psst.Response
 ---@field lines string[]
 ---@field label string
+---@field model string|nil
 ---@field status "streaming"|"complete"|"error"
 
 ---@class Psst.SessionHistory
@@ -72,11 +73,13 @@ end
 
 ---@param cwd string
 ---@param label string
+---@param model string|nil
 ---@return Psst.Session
 ---@return Psst.Response
-local function create_session(cwd, label)
+local function create_session(cwd, label, model)
     local response = {
         lines = { "" },
+        model = model,
         label = label,
         status = "streaming",
     }
@@ -107,17 +110,21 @@ end
 ---@param cwd string
 ---@param label string
 ---@param force_new boolean
+---@param model string|nil
 ---@return Psst.Session
 ---@return Psst.Response
-function M.begin_read(cwd, label, force_new)
+function M.begin_read(cwd, label, force_new, model)
     if streaming_response() then error("An agent response is already streaming") end
 
     local value = history()
     local selected = value and value.sessions[value.session_index] or nil
-    if force_new or not selected or selected.cwd ~= cwd then return create_session(cwd, label) end
+    if force_new or not selected or selected.cwd ~= cwd then
+        return create_session(cwd, label, model)
+    end
 
     local response = {
         lines = { "" },
+        model = model,
         label = label,
         status = "streaming",
     }

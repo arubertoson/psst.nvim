@@ -160,8 +160,10 @@ local function title()
     local selected = session.selection()
     if not selected then error("Cannot title a response float without a selection") end
 
-    local prefix = (" %s · S%d/%d · R%d/%d"):format(
+    local model = selected.response.model or "Pi default"
+    local prefix = (" %s · %s · S%d/%d · R%d/%d"):format(
         selected.response.label,
+        model,
         selected.session_index,
         selected.session_count,
         selected.response_index,

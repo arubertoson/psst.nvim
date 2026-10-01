@@ -12,6 +12,7 @@ local REQUEST_KEYS = {
     collect = true,
     prompt = true,
     preset = true,
+    model = true,
     context = true,
 }
 
@@ -89,6 +90,7 @@ function M.validate(request)
     end
     validate_optional_string(request.prompt, "agent prompt")
     validate_optional_string(request.preset, "agent preset")
+    validate_optional_string(request.model, "agent model")
 
     if request.collect ~= nil then
         if type(request.collect) ~= "table" or not vim.islist(request.collect) then

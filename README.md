@@ -164,6 +164,7 @@ Defaults:
 require("psst").setup({
     adapter = "pi",
     executable = "pi",
+    model = "openai-codex/gpt-6-luna:low", -- optional; omit to use Pi's configured default
     session_dir = vim.fs.joinpath(vim.fn.stdpath("cache"), "psst", "sessions"),
     float = {
         side = "right",
@@ -177,6 +178,12 @@ require("psst").setup({
 
 The float hooks receive `{ side, width }`. They exist so a personal layout can make
 space before the answer opens and restore itself after the answer closes.
+
+Use `:PsstModelSelect` to choose from the models reported by `pi --list-models`.
+The list loads asynchronously during setup and is cached for the Neovim session;
+run `:PsstModelsRefresh` to reload it. A picker choice applies to subsequent requests,
+and `model` can also be set per request. The response float title shows the model
+used for that response (`Pi default` when no model was explicitly selected).
 
 Pi command construction and event interpretation live in `psst.adapters.pi`. Future
 harnesses belong behind the same narrow boundary, but the adapter contract will grow
