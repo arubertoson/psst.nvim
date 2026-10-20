@@ -44,8 +44,8 @@ The editor interaction is the product. Pi is merely the first harness behind it.
 
 `psst.nvim` is not an autonomous coding environment, an agent dashboard, or a
 provider-neutral framework that flattens every harness into the same feature set. It
-does not install global keymaps by default, scan your repository in the background,
-or keep a permanent conversation pane open.
+does not scan your repository in the background or keep a permanent conversation
+pane open. Its optional global navigation mappings never replace existing keys.
 
 It is optimized for brief, contextual inquiries made in the middle of editing.
 
@@ -85,7 +85,7 @@ vim.pack.add({
 require("psst").setup()
 ```
 
-`psst.nvim` does not install global mappings by default. A minimal entry point is:
+`psst.nvim` does not map a prompt-opening key. A minimal entry point is:
 
 ```lua
 vim.keymap.set({ "n", "x" }, "<leader>p", function()
@@ -106,14 +106,65 @@ end, { desc = "Psst: quick question" })
 
 | Mapping | Action |
 | --- | --- |
-| `<CR>` | Ask, continuing the current working-directory session when available |
+| `<CR>` | Ask, continuing the selected session if its working directory matches |
 | `<C-CR>` | Ask in a fresh session |
 | `<C-g>` | Generate into the original selection or cursor position |
 | `<C-x>` | Inspect the context that will be sent |
 | `<M-CR>` | Insert a newline |
+| `<Esc>` | Close the prompt |
 
-Inline references can point at project files, file ranges, or symbols. The context
-overview shows the resolved material before submission.
+Generate is a one-shot request, independent of inquiry sessions. Output is buffered
+until completion, then inserted at the captured cursor or used to replace the
+original visual selection. The result becomes selected for another edit or
+generation request; normal undo reverts the change.
+
+## Inline context
+
+Add references directly to the prompt:
+
+| Form | Context |
+| --- | --- |
+| `@lua/psst/init.lua` | Whole file |
+| `@lua/psst/init.lua:120-180` | Inclusive, 1-based line range |
+| `@lua/psst/init.lua#M.send` | Named symbol in that file |
+| `@#M.send` | Named symbol in the invocation buffer |
+
+Relative paths use the working directory captured when the prompt opens. Symbols
+must match one Treesitter-indexed name exactly; missing or ambiguous names cannot
+be submitted. Directories and paths containing whitespace are not supported.
+References can be wrapped in Markdown backticks, but backticks do not allow spaces
+in paths. Optional Blink sources complete project files after `@` and symbols after
+`#`.
+
+References read loaded buffers, including unsaved changes; other files are loaded
+into hidden buffers. Editing or deleting a reference updates the derived context.
+Submission resolves every reference again and refuses incomplete or unresolved
+references without closing the prompt.
+
+Inline context is combined with invocation and collector context for both inquiry
+and generation. Duplicate source ranges are included once; a whole-file attachment
+supersedes source ranges from that file without removing diagnostics. Other
+overlapping ranges remain separate.
+
+Use `<C-x>` for a read-only overview of attached items and unresolved references,
+not their full source contents. It opens in Normal mode; closing it returns to the
+prompt.
+
+## Sessions and responses
+
+`<CR>` continues the selected session only when its working directory matches the
+prompt invocation; otherwise it starts a new session. `<C-CR>` always starts a new
+session. Continuation targets that session's explicit Pi identity, not whichever
+conversation Pi last used.
+
+Only one inquiry response can stream at a time. Navigation remains available while
+it streams in the background, and completion does not change your selection. Each
+session remembers its selected response; navigation stops at the boundaries rather
+than wrapping. The float displays only the selected answer, not submitted prompts,
+and its title identifies the session and response positions.
+
+Closing the float preserves history. Session navigation is in memory only and does
+not survive a Neovim restart, even though Pi session files remain on disk.
 
 When focused, the response float has buffer-local controls:
 
@@ -153,8 +204,14 @@ psst.float.session_prev()
 psst.float.session_next()
 ```
 
-Use `:PsstSessionsClear` to discard all in-memory responses and persisted Pi session
-data owned by the plugin.
+Use `:PsstSessionsClear` to discard every in-memory session and response, close the
+float, and recursively delete the configured `session_dir` across all working
+directories. The command refuses to run while an inquiry is streaming. If deletion
+fails, history and float visibility are preserved.
+
+**`session_dir` is exclusively plugin-owned and disposable.** Never point it at
+ordinary Pi sessions or any directory containing unrelated files. The directory is
+recreated lazily by the next inquiry.
 
 ## Configuration
 
@@ -164,7 +221,7 @@ Defaults:
 require("psst").setup({
     adapter = "pi",
     executable = "pi",
-    model = "openai-codex/gpt-6-luna:low", -- optional; omit to use Pi's configured default
+    model = nil, -- use Pi's configured default
     session_dir = vim.fs.joinpath(vim.fn.stdpath("cache"), "psst", "sessions"),
     float = {
         side = "right",
@@ -172,12 +229,13 @@ require("psst").setup({
         before_open = nil,
         after_close = nil,
     },
-    keymaps = { global = false },
+    keymaps = { global = true, float = true },
 })
 ```
 
-The float hooks receive `{ side, width }`. They exist so a personal layout can make
-space before the answer opens and restore itself after the answer closes.
+The float hooks receive `{ side, width }` once per hidden/visible transition, not
+when selecting another response. They let a personal layout make space before the
+answer opens and restore itself after the answer closes.
 
 Use `:PsstModelSelect` to choose from the models reported by `pi --list-models`.
 The list loads asynchronously during setup and is cached for the Neovim session;
@@ -214,8 +272,5 @@ just check
 
 `just check` verifies formatting and runs the tests in headless Neovim.
 
-## Design notes
-
-- [`docs/interaction.md`](docs/interaction.md)
-- [`docs/inline-context.md`](docs/inline-context.md)
-- [`docs/session-history.md`](docs/session-history.md)
+`just demo` records `docs/demo.gif` using VHS. The generated GIF is ignored and
+should not be committed; the README uses the release-hosted demo instead.
