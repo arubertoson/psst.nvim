@@ -140,6 +140,21 @@ T["harness"]["config rejects malformed and unknown options"] = function()
             message = "psst keymaps global must be a boolean",
         },
         { opts = { keymaps = { typo = true } }, message = "unknown psst keymaps option" },
+        { opts = { tools = true }, message = "psst tools config must be a table" },
+        { opts = { tools = { typo = {} } }, message = "unknown psst tools option" },
+        { opts = { tools = { inquire = "read" } }, message = "inquire must be a list" },
+        { opts = { tools = { inquire = { [2] = "read" } } }, message = "must be a list" },
+        { opts = { tools = { inquire = { "" } } }, message = "must be a non-empty string" },
+        { opts = { tools = { generate = { false } } }, message = "must be a non-empty string" },
+        { opts = { tools = { inquire = { "read,bash" } } }, message = "individual tool names" },
+        { opts = { tools = { inquire = { " read" } } }, message = "individual tool names" },
+        { opts = { tools = { inquire = { "+bash" } } }, message = "individual tool names" },
+        { opts = { instructions = "brief" }, message = "instructions config must be a table" },
+        {
+            opts = { instructions = { typo = "brief" } },
+            message = "unknown psst instructions option",
+        },
+        { opts = { instructions = { generate = false } }, message = "generate must be a string" },
     }
 
     for _, case in ipairs(invalid) do
@@ -174,20 +189,23 @@ T["harness"]["Pi adapter builds an inquiry command with an explicit session"] = 
         adapter = "pi",
         session_dir = "/tmp/sessions",
         float = { side = "right", width = 60 },
+        tools = require("psst.config").get().tools,
     }, {
         destination = "float",
         preset = "review",
     }, {
         kind = "explicit",
         id = "session-id",
-    }, "inquire")
+    }, "inquire", "Workflow instructions")
 
     MiniTest.expect.equality(command, {
         "pi-dev",
         "--preset",
         "review",
         "--tools",
-        "read,ffgrep,fffind",
+        "read,grep,find,ls",
+        "--append-system-prompt",
+        "Workflow instructions",
         "--mode",
         "json",
         "--session-dir",
@@ -195,6 +213,149 @@ T["harness"]["Pi adapter builds an inquiry command with an explicit session"] = 
         "--session-id",
         "session-id",
     })
+end
+
+local instruction_fixture_dir
+
+T["instructions"] = MiniTest.new_set({
+    hooks = {
+        pre_case = function()
+            instruction_fixture_dir = vim.fn.tempname()
+            vim.fs.mkdir(instruction_fixture_dir, { parents = true })
+            local executable = vim.fs.joinpath(instruction_fixture_dir, "pi-fixture")
+            vim.fn.writefile(vim.fn.readfile("tests/fixtures/pi-instructions.sh"), executable)
+            vim.fn.setfperm(executable, "rwx------")
+            require("psst").setup({
+                executable = executable,
+                session_dir = vim.fs.joinpath(instruction_fixture_dir, "sessions"),
+            })
+        end,
+        post_case = function() vim.fn.delete(instruction_fixture_dir, "rf") end,
+    },
+})
+
+local function captured(name)
+    return table.concat(vim.fn.readfile(vim.fs.joinpath(instruction_fixture_dir, name)), "\n")
+end
+
+T["instructions"]["inquiries append defaults and additions on every turn without changing user context"] = function()
+    local agent = require("psst")
+    local channels = require("psst.channels")
+    local request = {
+        destination = channels.DESTINATION.FLOAT,
+        context = {
+            { kind = "file", source = true, path = "example.lua", text = "local value = 1" },
+        },
+        prompt = "Explain value",
+    }
+    local function send()
+        MiniTest.expect.equality(agent.send(request), true)
+        MiniTest.expect.equality(
+            vim.wait(2000, function() return not require("psst.session").is_streaming() end),
+            true
+        )
+        MiniTest.expect.equality(require("psst.session").selection().response.status, "complete")
+        MiniTest.expect.equality(
+            captured("request"),
+            '<file name="example.lua">\nlocal value = 1\n</file>\n\nExplain value'
+        )
+        return captured("instructions")
+    end
+
+    local defaults = send()
+    local session_id = captured("session-id")
+    MiniTest.expect.equality(
+        defaults:find("This is an inquiry, not an implementation task.", 1, true) ~= nil,
+        true
+    )
+    MiniTest.expect.equality(defaults:find("Be concise", 1, true) ~= nil, true)
+
+    local additional = 'Prefer concrete examples.\nUse "quoted" symbols.'
+    agent.setup({ instructions = { inquire = additional, generate = "Generation only." } })
+    MiniTest.expect.equality(send(), defaults .. "\n\n" .. additional)
+    MiniTest.expect.equality(captured("session-id"), session_id)
+
+    agent.setup({ instructions = { inquire = "" } })
+    MiniTest.expect.equality(send(), defaults)
+end
+
+T["instructions"]["generation keeps instructions out of the user message and inserts the response"] = function()
+    local agent = require("psst")
+    local buf = vim.api.nvim_get_current_buf()
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "local  = true" })
+    vim.api.nvim_win_set_cursor(0, { 1, 6 })
+    agent.setup({
+        instructions = { inquire = "Inquiry only.", generate = "Follow nearby naming." },
+    })
+    -- Unrelated setup and an inquiry-only update must retain generation instructions.
+    agent.setup({ instructions = { inquire = "Updated inquiry." }, keymaps = { global = false } })
+    MiniTest.expect.equality(
+        agent.send({ destination = "editor", prompt = "Insert a name" }),
+        true
+    )
+    MiniTest.expect.equality(
+        vim.wait(
+            2000,
+            function()
+                return vim.api.nvim_buf_get_lines(buf, 0, -1, false)[1] == "local generated = true"
+            end
+        ),
+        true
+    )
+
+    local instructions = captured("instructions")
+    MiniTest.expect.equality(
+        instructions:find("Return only the text to insert or replace", 1, true) ~= nil,
+        true
+    )
+    MiniTest.expect.equality(instructions:find("Follow nearby naming.", 1, true) ~= nil, true)
+    MiniTest.expect.equality(
+        instructions:find("Return only the text to insert at the cursor.", 1, true) ~= nil,
+        true
+    )
+    MiniTest.expect.equality(instructions:find("Inquiry", 1, true), nil)
+    MiniTest.expect.equality(captured("request"), "Insert a name")
+    MiniTest.expect.equality(captured("tools"), "read,grep,find,ls")
+end
+
+T["instructions"]["visual generation asks for a complete selection replacement"] = function()
+    local agent = require("psst")
+    local buf = vim.api.nvim_get_current_buf()
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "local old = true" })
+    vim.fn.setpos("'<", { buf, 1, 7, 0 })
+    vim.fn.setpos("'>", { buf, 1, 9, 0 })
+    agent.prompt({ visual_mode = "v", collect = {} })
+    local prompt_buf = vim.api.nvim_get_current_buf()
+    vim.api.nvim_buf_set_lines(prompt_buf, 0, -1, false, { "Replace the name" })
+    local submitted = false
+    for _, mapping in ipairs(vim.api.nvim_buf_get_keymap(prompt_buf, "i")) do
+        if mapping.lhs == "<C-G>" then
+            mapping.callback()
+            submitted = true
+            break
+        end
+    end
+    MiniTest.expect.equality(submitted, true)
+    MiniTest.expect.equality(
+        vim.wait(
+            2000,
+            function()
+                return vim.api.nvim_buf_get_lines(buf, 0, -1, false)[1] == "local generated = true"
+            end
+        ),
+        true
+    )
+
+    local instructions = captured("instructions")
+    MiniTest.expect.equality(
+        instructions:find("Return the complete replacement for the selected text.", 1, true) ~= nil,
+        true
+    )
+    MiniTest.expect.equality(
+        instructions:find("Return only the text to insert at the cursor.", 1, true),
+        nil
+    )
+    MiniTest.expect.equality(captured("request"), "Replace the name")
 end
 
 T["session"] = MiniTest.new_set()
@@ -854,7 +1015,7 @@ T["facade"]["read requests reuse explicit identity unless forced new"] = functio
         end
     end
 
-    MiniTest.expect.equality(argument_value(calls[1], "--tools"), "read,ffgrep,fffind")
+    MiniTest.expect.equality(argument_value(calls[1], "--tools"), "read,grep,find,ls")
     MiniTest.expect.equality(
         argument_value(calls[1], "--session-id"),
         argument_value(calls[2], "--session-id")
@@ -864,6 +1025,46 @@ T["facade"]["read requests reuse explicit identity unless forced new"] = functio
         true
     )
     MiniTest.expect.equality(require("psst.session").counts(), 2)
+    pcall(vim.fs.rm, session_dir, { recursive = true })
+end
+
+T["facade"]["tool allowlists are configurable per workflow and replace previous selections"] = function()
+    local calls = {}
+    require("psst.process").json = function(opts)
+        calls[#calls + 1] = opts
+        opts.on_exit({ code = 0, stderr = "" })
+    end
+
+    local channels = require("psst.channels")
+    local agent = require("psst")
+    local session_dir = vim.fn.tempname()
+    local tools = {
+        inquire = { "read", "ffgrep", "fffind", "codemode" },
+        generate = { "read", "bash" },
+    }
+    agent.setup({ session_dir = session_dir, tools = tools })
+    tools.inquire[1] = "write"
+    agent.setup({ model = "test-model" })
+
+    local function send(destination)
+        agent.send({ destination = destination, collect = {}, prompt = "test" })
+        local args = calls[#calls].args
+        for index, arg in ipairs(args) do
+            if arg == "--tools" then return args[index + 1] end
+        end
+        return vim.tbl_contains(args, "--no-tools") and "disabled" or "inherited"
+    end
+
+    MiniTest.expect.equality(send(channels.DESTINATION.FLOAT), "read,ffgrep,fffind,codemode")
+    MiniTest.expect.equality(send(channels.DESTINATION.EDITOR), "read,bash")
+
+    agent.setup({ tools = { inquire = { "read" } } })
+    MiniTest.expect.equality(send(channels.DESTINATION.FLOAT), "read")
+    MiniTest.expect.equality(send(channels.DESTINATION.EDITOR), "read,bash")
+
+    agent.setup({ tools = { inquire = {}, generate = {} } })
+    MiniTest.expect.equality(send(channels.DESTINATION.FLOAT), "disabled")
+    MiniTest.expect.equality(send(channels.DESTINATION.EDITOR), "disabled")
     pcall(vim.fs.rm, session_dir, { recursive = true })
 end
 
@@ -895,9 +1096,7 @@ T["facade"]["concurrent Read is rejected without starting a process"] = function
 end
 
 T["facade"]["Generate does not create or select Agent Sessions"] = function()
-    local process_opts
     require("psst.process").json = function(opts)
-        process_opts = opts
         opts.on_event(text_event("generated"))
         opts.on_exit({ code = 0, stderr = "" })
     end
@@ -913,7 +1112,6 @@ T["facade"]["Generate does not create or select Agent Sessions"] = function()
     })
 
     MiniTest.expect.equality(sent, true)
-    MiniTest.expect.equality(vim.tbl_contains(process_opts.args, "--tools"), false)
     MiniTest.expect.equality({ require("psst.session").counts() }, { 0, 0 })
     MiniTest.expect.equality(vim.uv.fs_stat(session_dir), nil)
 end

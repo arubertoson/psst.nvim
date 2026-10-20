@@ -27,6 +27,14 @@ local M = {}
 ---@field global boolean
 ---@field float boolean
 
+---@class Psst.config.ToolOpts
+---@field inquire string[]|nil Inquiry allowlist; defaults to read, grep, find, ls. Empty disables tools.
+---@field generate string[]|nil Generation allowlist; defaults to read, grep, find, ls. Empty disables tools.
+
+---@class Psst.config.InstructionOpts
+---@field inquire string|nil Additional literal instructions, appended to Psst's inquiry defaults.
+---@field generate string|nil Additional literal instructions; generation output requirements remain in effect.
+
 ---@class Psst.config.Opts
 ---@field executable string|nil
 ---@field adapter string|nil
@@ -34,6 +42,8 @@ local M = {}
 ---@field model string|nil
 ---@field float Psst.config.FloatOpts|nil
 ---@field keymaps Psst.config.KeymapOpts|nil
+---@field tools Psst.config.ToolOpts|nil
+---@field instructions Psst.config.InstructionOpts|nil
 
 ---@class Psst.config.Config
 ---@field executable string
@@ -42,6 +52,8 @@ local M = {}
 ---@field model string|nil
 ---@field float Psst.config.FloatConfig
 ---@field keymaps Psst.config.KeymapConfig
+---@field tools Psst.config.ToolOpts
+---@field instructions Psst.config.InstructionOpts
 
 local defaults = {
     executable = "pi",
@@ -53,6 +65,11 @@ local defaults = {
         width = 60,
     },
     keymaps = { global = true, float = true },
+    tools = {
+        inquire = { "read", "grep", "find", "ls" },
+        generate = { "read", "grep", "find", "ls" },
+    },
+    instructions = {},
 }
 
 ---@type Psst.config.Config
@@ -65,9 +82,13 @@ local CONFIG_KEYS = {
     float = true,
     keymaps = true,
     model = true,
+    tools = true,
+    instructions = true,
 }
 
 local KEYMAP_KEYS = { global = true, float = true }
+local TOOL_KEYS = { inquire = true, generate = true }
+local INSTRUCTION_KEYS = { inquire = true, generate = true }
 
 local FLOAT_KEYS = {
     side = true,
@@ -101,6 +122,35 @@ function M.setup(opts)
         if opts[name] ~= nil then validate_nonempty_string(opts[name], "psst " .. name) end
     end
     if opts.model ~= nil then validate_nonempty_string(opts.model, "psst model") end
+
+    if opts.tools ~= nil then
+        if type(opts.tools) ~= "table" then error("psst tools config must be a table") end
+        validate_keys(opts.tools, TOOL_KEYS, "psst tools")
+        for intent, tools in pairs(opts.tools) do
+            local name = "psst tools " .. intent
+            if type(tools) ~= "table" or not vim.islist(tools) then
+                error(name .. " must be a list")
+            end
+            for index, tool in ipairs(tools) do
+                validate_nonempty_string(tool, ("%s[%d]"):format(name, index))
+                if tool:find("[,%s]") or tool:find("^[+-]") then
+                    error(name .. " entries must be individual tool names or patterns")
+                end
+            end
+        end
+    end
+
+    if opts.instructions ~= nil then
+        if type(opts.instructions) ~= "table" then
+            error("psst instructions config must be a table")
+        end
+        validate_keys(opts.instructions, INSTRUCTION_KEYS, "psst instructions")
+        for intent, text in pairs(opts.instructions) do
+            if type(text) ~= "string" then
+                error("psst instructions " .. intent .. " must be a string")
+            end
+        end
+    end
 
     if opts.float ~= nil then
         if type(opts.float) ~= "table" then error("psst float config must be a table") end
@@ -137,6 +187,10 @@ function M.setup(opts)
     end
 
     config = vim.tbl_deep_extend("force", config, opts)
+    -- Allowlists replace rather than merge, including an explicitly empty list.
+    for intent, tools in pairs(opts.tools or {}) do
+        config.tools[intent] = vim.deepcopy(tools)
+    end
 end
 
 ---@return Psst.config.Config

@@ -53,6 +53,7 @@ local M = {}
 local config = require("psst.config")
 local adapters = require("psst.adapters")
 local payload = require("psst.payload")
+local instructions = require("psst.instructions")
 local collect = require("psst.collect")
 local channels = require("psst.channels")
 local prompt_ui = require("psst.prompt")
@@ -157,12 +158,16 @@ local function send(request, state)
         vim.fs.mkdir(cfg.session_dir, { parents = true })
     end
 
+    local workflow_instructions =
+        instructions.render(intent, cfg.instructions[intent], state.selection)
+
     local function run(stdin, on_event, on_exit)
         return adapter.run({
             config = cfg,
             request = effective_request,
             target = target,
             intent = intent,
+            instructions = workflow_instructions,
             stdin = stdin,
             cwd = state.cwd,
             on_event = on_event,

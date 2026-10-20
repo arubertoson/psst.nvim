@@ -5,8 +5,6 @@ local M = {}
 
 local process = require("psst.process")
 
-local INQUIRY_TOOLS = { "read", "ffgrep", "fffind" }
-
 ---@param args string[]
 ---@param target Psst.adapters.SessionTarget
 ---@param session_dir string
@@ -23,8 +21,9 @@ end
 ---@param request Psst.Request
 ---@param target Psst.adapters.SessionTarget
 ---@param intent Psst.adapters.Intent
+---@param instructions string
 ---@return string[]
-function M._command(config, request, target, intent)
+function M._command(config, request, target, intent, instructions)
     local args = { config.executable }
 
     if request.preset and request.preset ~= "" then
@@ -34,11 +33,16 @@ function M._command(config, request, target, intent)
         vim.list_extend(args, { "--model", request.model })
     end
 
-    if intent == "inquire" then
-        vim.list_extend(args, { "--tools", table.concat(INQUIRY_TOOLS, ",") })
+    local tools = config.tools[intent]
+    if tools ~= nil then
+        if #tools == 0 then
+            table.insert(args, "--no-tools")
+        else
+            vim.list_extend(args, { "--tools", table.concat(tools, ",") })
+        end
     end
 
-    vim.list_extend(args, { "--mode", "json" })
+    vim.list_extend(args, { "--append-system-prompt", instructions, "--mode", "json" })
     extend_with_session(args, target, config.session_dir)
     return args
 end
@@ -46,7 +50,8 @@ end
 ---@param opts Psst.adapters.RunOpts
 ---@return vim.SystemObj
 function M.run(opts)
-    local command = M._command(opts.config, opts.request, opts.target, opts.intent)
+    local command =
+        M._command(opts.config, opts.request, opts.target, opts.intent, opts.instructions)
     return process.json({
         executable = command[1],
         args = vim.list_slice(command, 2),

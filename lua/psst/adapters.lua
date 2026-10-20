@@ -22,6 +22,7 @@ local M = {}
 ---@field request Psst.Request
 ---@field target Psst.adapters.SessionTarget
 ---@field intent Psst.adapters.Intent
+---@field instructions string Workflow instructions to append to the harness's base system prompt.
 ---@field stdin string
 ---@field cwd string
 ---@field on_event fun(event: table)

@@ -11,17 +11,6 @@ local lines = require("psst.lines")
 local progress = require("psst.progress")
 local process = require("psst.process")
 
-local INSERT_SYSTEM_PROMPT = [[You are a code generation assistant embedded in a text editor.
-Reply ONLY with the code that should be inserted at the cursor position.
-Do NOT include any explanation, markdown fences, or prose.
-Do NOT repeat code that already exists around the cursor.
-Output raw code only.]]
-
-local REPLACE_SYSTEM_PROMPT = [[You are a code generation assistant embedded in a text editor.
-Reply ONLY with the replacement code for the selected block.
-Do NOT include any explanation, markdown fences, or prose.
-Output raw code only.]]
-
 ---@class Psst.channels.editor.State: Psst.progress.State
 ---@field buf integer
 ---@field win integer
@@ -161,15 +150,12 @@ function M.send(transport, ctx)
     progress.init(state)
     _state = state
 
-    local system_prompt = selection and REPLACE_SYSTEM_PROMPT or INSERT_SYSTEM_PROMPT
-    local stdin = transport.message == "" and system_prompt
-        or system_prompt .. "\n\nUser request: " .. transport.message
-    logger.info("Sending editor channel request", start_row, start_col, stdin)
+    logger.info("Sending editor channel request", start_row, start_col, transport.message)
 
     refresh_progress(state)
     start_spinner(state)
 
-    local ok, process_or_error = pcall(transport.run, stdin, function(event)
+    local ok, process_or_error = pcall(transport.run, transport.message, function(event)
         if _state ~= state then return end
         transport.dispatch(event, {
             on_thinking = function()
